@@ -28,6 +28,18 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!--
+            Mensajeria: bookings es la fuente de los eventos de dominio del
+            ciclo de vida de una reserva (SOLICITADA -> APROBADA -> ... ),
+            por lo que publica esos cambios de estado a Kafka. No usa
+            RabbitMQ: no tiene responsabilidad de notificaciones/colas punto
+            a punto, esa la tiene catalog.
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
         <!-- Persistencia JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -48,6 +60,12 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-oracle</artifactId>
+        </dependency>
+
+        <!-- Actuator (health checks: lo usa el healthcheck de Docker/compose) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
         <!-- Seguridad: OAuth2 Resource Server (validación de JWT) -->

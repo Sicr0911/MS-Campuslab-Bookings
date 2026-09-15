@@ -29,6 +29,12 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    # Evita que baseline-on-migrate "consuma" V1__create_reservas_table.sql:
+    # en un schema vacio, sin esto Flyway baselinea en la version 1 por
+    # defecto (coincide con la primera migracion real) y la da por aplicada
+    # sin ejecutarla. baselineVersion 0 deja V1 como la primera migracion
+    # pendiente de verdad.
+    baseline-version: 0
     locations: classpath:db/migration
 
   security:
@@ -38,6 +44,11 @@ spring:
           # URL del Identity Provider (ej. ms-auth / Keycloak) que expone las claves publicas
           issuer-uri: ${AUTH_ISSUER_URI:http://localhost:8080/realms/campuslab}
 
+  # Broker externo donde se publican los eventos de cambio de estado de una
+  # reserva (ver spring-kafka en el pom.xml).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.201.119.90:9092}
+
 management:
   endpoints:
     web:
@@ -46,6 +57,13 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # El healthcheck de Docker depende de /actuator/health devolviendo 200;
+    # el indicador automatico de Kafka prueba conectividad real contra el
+    # broker (externo, fuera de esta red) y lo tumbaria a DOWN si ese broker
+    # no esta disponible en este momento, aunque la app en si funcione bien.
+    kafka:
+      enabled: false
 
 # URL base del microservicio ms-campuslab-catalog, consultado por CatalogClient
 # para verificar stock/cupo disponible antes de aprobar una reserva.

@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import java.util.Collection;
 import java.util.List;
@@ -33,7 +34,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // API stateless consumida por otros servicios/SPAs con JWT
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**").permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/actuator/health")).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/actuator/health/**")).permitAll()
+                        // Si algun indicador de salud reporta DOWN, /actuator/health
+                        // responde con status != 2xx y Tomcat reenvia internamente a
+                        // /error para renderizarlo; ese reenvio es una peticion nueva
+                        // que vuelve a pasar por este filtro. Sin permitirla tambien,
+                        // cae en anyRequest().authenticated() y el cliente recibe un
+                        // 401 que oculta el verdadero error (ej. 503).
+                        .requestMatchers(new AntPathRequestMatcher("/error")).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
