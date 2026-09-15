@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: 8082
 
 spring:
   application:
@@ -46,6 +46,12 @@ management:
   endpoint:
     health:
       show-details: never
+
+# URL base del microservicio ms-campuslab-catalog, consultado por CatalogClient
+# para verificar stock/cupo disponible antes de aprobar una reserva.
+campuslab:
+  services:
+    catalog-base-url: ${CATALOG_SERVICE_URL:http://localhost:8081}
 
 logging:
   level:

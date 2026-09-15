@@ -1,6 +1,9 @@
 package com.campuslab.bookings.service;
 
+import com.campuslab.bookings.client.CatalogClient;
+import com.campuslab.bookings.client.CatalogClientException;
 import com.campuslab.bookings.dto.CambioEstadoRequestDTO;
+import com.campuslab.bookings.dto.CatalogResourceDTO;
 import com.campuslab.bookings.exception.TransicionEstadoInvalidaException;
 import com.campuslab.bookings.model.EstadoReserva;
 import com.campuslab.bookings.model.Reserva;
@@ -21,12 +24,14 @@ import static org.mockito.Mockito.when;
 class ReservaServiceImplTest {
 
     private ReservaRepository reservaRepository;
+    private CatalogClient catalogClient;
     private ReservaServiceImpl service;
 
     @BeforeEach
     void setUp() {
         reservaRepository = Mockito.mock(ReservaRepository.class);
-        service = new ReservaServiceImpl(reservaRepository);
+        catalogClient = Mockito.mock(CatalogClient.class);
+        service = new ReservaServiceImpl(reservaRepository, catalogClient);
     }
 
     @Test
@@ -72,6 +77,54 @@ class ReservaServiceImplTest {
                 service.cambiarEstado(1L, request, 99L, Set.of("ESTUDIANTE")))
                 .isInstanceOf(TransicionEstadoInvalidaException.class)
                 .hasMessageContaining("TECNICO o ADMIN");
+    }
+
+    @Test
+    void noDebePermitirAprobarSiElCatalogoNoTieneStock() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(catalogClient.obtenerRecurso(10L))
+                .thenReturn(new CatalogResourceDTO(10L, "Microscopio", "EQUIPO", 0));
+
+        CambioEstadoRequestDTO request = new CambioEstadoRequestDTO();
+        request.setNuevoEstado(EstadoReserva.APROBADA);
+
+        assertThatThrownBy(() ->
+                service.cambiarEstado(1L, request, 99L, Set.of("TECNICO")))
+                .isInstanceOf(TransicionEstadoInvalidaException.class)
+                .hasMessageContaining("stock/cupo disponible");
+    }
+
+    @Test
+    void noDebePermitirAprobarSiElCatalogoNoResponde() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(catalogClient.obtenerRecurso(10L))
+                .thenThrow(new CatalogClientException("timeout"));
+
+        CambioEstadoRequestDTO request = new CambioEstadoRequestDTO();
+        request.setNuevoEstado(EstadoReserva.APROBADA);
+
+        assertThatThrownBy(() ->
+                service.cambiarEstado(1L, request, 99L, Set.of("TECNICO")))
+                .isInstanceOf(TransicionEstadoInvalidaException.class)
+                .hasMessageContaining("catalogo");
+    }
+
+    @Test
+    void debePermitirAprobarSiElCatalogoTieneStock() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(catalogClient.obtenerRecurso(10L))
+                .thenReturn(new CatalogResourceDTO(10L, "Microscopio", "EQUIPO", 5));
+
+        CambioEstadoRequestDTO request = new CambioEstadoRequestDTO();
+        request.setNuevoEstado(EstadoReserva.APROBADA);
+
+        var resultado = service.cambiarEstado(1L, request, 99L, Set.of("TECNICO"));
+
+        assertThat(resultado.getEstado()).isEqualTo(EstadoReserva.APROBADA);
     }
 
     @Test

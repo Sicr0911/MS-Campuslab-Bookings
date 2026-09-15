@@ -1,6 +1,9 @@
 package com.campuslab.bookings.service;
 
+import com.campuslab.bookings.client.CatalogClient;
+import com.campuslab.bookings.client.CatalogClientException;
 import com.campuslab.bookings.dto.CambioEstadoRequestDTO;
+import com.campuslab.bookings.dto.CatalogResourceDTO;
 import com.campuslab.bookings.dto.ReservaRequestDTO;
 import com.campuslab.bookings.dto.ReservaResponseDTO;
 import com.campuslab.bookings.exception.ReservaNotFoundException;
@@ -26,6 +29,7 @@ public class ReservaServiceImpl implements ReservaService {
     private static final Set<String> ROLES_QUE_PUEDEN_APROBAR = Set.of("TECNICO", "ADMIN");
 
     private final ReservaRepository reservaRepository;
+    private final CatalogClient catalogClient;
 
     @Override
     @Transactional
@@ -130,6 +134,7 @@ public class ReservaServiceImpl implements ReservaService {
                     throw new TransicionEstadoInvalidaException(
                             "Solo un usuario con rol TECNICO o ADMIN puede aprobar una reserva");
                 }
+                validarStockDisponibleEnCatalogo(reserva);
             }
             case EN_USO -> {
                 if (!reserva.tieneAprobacionRegistrada()) {
@@ -146,6 +151,29 @@ public class ReservaServiceImpl implements ReservaService {
             default -> {
                 // EN_PREPARACION y DEVUELTA no requieren validaciones adicionales de rol/estado.
             }
+        }
+    }
+
+    /**
+     * Consulta a ms-campuslab-catalog el recurso reservado y bloquea la
+     * aprobacion si no queda stock/cupo disponible. Si el catalogo no
+     * responde (caido, timeout, recurso inexistente) la aprobacion tambien
+     * se bloquea: no se puede aprobar sin poder verificar la disponibilidad real.
+     */
+    private void validarStockDisponibleEnCatalogo(Reserva reserva) {
+        CatalogResourceDTO recurso;
+        try {
+            recurso = catalogClient.obtenerRecurso(reserva.getRecursoId());
+        } catch (CatalogClientException ex) {
+            throw new TransicionEstadoInvalidaException(
+                    "No se pudo verificar la disponibilidad del recurso " + reserva.getRecursoId()
+                            + " en el catalogo: " + ex.getMessage());
+        }
+
+        if (recurso.getStockCupo() == null || recurso.getStockCupo() <= 0) {
+            throw new TransicionEstadoInvalidaException(
+                    "No es posible aprobar la reserva: el recurso " + reserva.getRecursoId()
+                            + " no tiene stock/cupo disponible en el catalogo");
         }
     }
 
