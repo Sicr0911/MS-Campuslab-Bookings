@@ -6,6 +6,7 @@ import com.campuslab.bookings.dto.CambioEstadoRequestDTO;
 import com.campuslab.bookings.dto.CatalogResourceDTO;
 import com.campuslab.bookings.exception.TransicionEstadoInvalidaException;
 import com.campuslab.bookings.messaging.ReservaEventPublisher;
+import com.campuslab.bookings.messaging.ReservaKafkaEventPublisher;
 import com.campuslab.bookings.model.EstadoReserva;
 import com.campuslab.bookings.model.Reserva;
 import com.campuslab.bookings.repository.ReservaRepository;
@@ -27,6 +28,7 @@ class ReservaServiceImplTest {
     private ReservaRepository reservaRepository;
     private CatalogClient catalogClient;
     private ReservaEventPublisher eventPublisher;
+    private ReservaKafkaEventPublisher kafkaEventPublisher;
     private ReservaServiceImpl service;
 
     @BeforeEach
@@ -34,7 +36,8 @@ class ReservaServiceImplTest {
         reservaRepository = Mockito.mock(ReservaRepository.class);
         catalogClient = Mockito.mock(CatalogClient.class);
         eventPublisher = Mockito.mock(ReservaEventPublisher.class);
-        service = new ReservaServiceImpl(reservaRepository, catalogClient, eventPublisher);
+        kafkaEventPublisher = Mockito.mock(ReservaKafkaEventPublisher.class);
+        service = new ReservaServiceImpl(reservaRepository, catalogClient, eventPublisher, kafkaEventPublisher);
     }
 
     @Test

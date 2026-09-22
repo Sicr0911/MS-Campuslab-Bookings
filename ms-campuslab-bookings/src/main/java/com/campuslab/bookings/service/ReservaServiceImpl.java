@@ -9,6 +9,7 @@ import com.campuslab.bookings.dto.ReservaResponseDTO;
 import com.campuslab.bookings.exception.ReservaNotFoundException;
 import com.campuslab.bookings.exception.TransicionEstadoInvalidaException;
 import com.campuslab.bookings.messaging.ReservaEventPublisher;
+import com.campuslab.bookings.messaging.ReservaKafkaEventPublisher;
 import com.campuslab.bookings.model.EstadoReserva;
 import com.campuslab.bookings.model.Reserva;
 import com.campuslab.bookings.repository.ReservaRepository;
@@ -32,6 +33,7 @@ public class ReservaServiceImpl implements ReservaService {
     private final ReservaRepository reservaRepository;
     private final CatalogClient catalogClient;
     private final ReservaEventPublisher eventPublisher;
+    private final ReservaKafkaEventPublisher kafkaEventPublisher;
 
     @Override
     @Transactional
@@ -50,6 +52,7 @@ public class ReservaServiceImpl implements ReservaService {
                 .build();
 
         Reserva guardada = reservaRepository.save(reserva);
+        kafkaEventPublisher.publicar("RESERVA_CREADA", guardada);
         return ReservaResponseDTO.fromEntity(guardada);
     }
 
@@ -94,6 +97,7 @@ public class ReservaServiceImpl implements ReservaService {
         reserva.setEstado(estadoDestino);
 
         Reserva actualizada = reservaRepository.save(reserva);
+        kafkaEventPublisher.publicar("RESERVA_" + estadoDestino.name(), actualizada);
         return ReservaResponseDTO.fromEntity(actualizada);
     }
 

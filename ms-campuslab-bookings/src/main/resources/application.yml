@@ -45,9 +45,14 @@ spring:
           issuer-uri: ${AUTH_ISSUER_URI:http://localhost:8080/realms/campuslab}
 
   # Broker externo donde se publican los eventos de cambio de estado de una
-  # reserva (ver spring-kafka en el pom.xml).
+  # reserva (ver spring-kafka en el pom.xml). bookings.events es la fuente
+  # de verdad que consumen ms-campuslab-audit y ms-campuslab-report.
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.201.119.90:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
 
   # Cluster RabbitMQ self-hosted (infra/mq): bookings publica ahi los eventos
   # de cambio de estado de una reserva para que ms-campuslab-notify dispare
