@@ -11,7 +11,12 @@ import java.time.LocalDateTime;
 
 public interface ReservaService {
 
-    ReservaResponseDTO crear(ReservaRequestDTO request);
+    /**
+     * @param usuarioSolicitanteId id del usuario autenticado que solicita la reserva,
+     *                             derivado del JWT (nunca autoreportado por el cliente:
+     *                             evita que alguien cree una reserva "a nombre de" otro usuario)
+     */
+    ReservaResponseDTO crear(ReservaRequestDTO request, Long usuarioSolicitanteId);
 
     ReservaResponseDTO obtenerPorId(Long id);
 

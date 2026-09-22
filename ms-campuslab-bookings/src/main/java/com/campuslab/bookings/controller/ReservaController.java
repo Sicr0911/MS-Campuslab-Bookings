@@ -34,8 +34,9 @@ public class ReservaController {
      * puede solicitar una reserva; nace en estado SOLICITADA.
      */
     @PostMapping
-    public ResponseEntity<ReservaResponseDTO> crear(@Valid @RequestBody ReservaRequestDTO request) {
-        ReservaResponseDTO creada = reservaService.crear(request);
+    public ResponseEntity<ReservaResponseDTO> crear(@Valid @RequestBody ReservaRequestDTO request,
+                                                      @AuthenticationPrincipal Jwt jwt) {
+        ReservaResponseDTO creada = reservaService.crear(request, extraerUsuarioId(jwt));
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
 
@@ -106,12 +107,23 @@ public class ReservaController {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Azure AD no emite un id numerico de usuario: "sub"/"oid" son GUIDs, no
+     * Long. Si el IdP manda un claim "userId" explicito (ej. otro IdP tipo
+     * Keycloak configurado para ese caso) se usa tal cual; si no, se deriva
+     * un id numerico estable a partir del subject (mismo usuario -> mismo id
+     * siempre) en vez de intentar Long.valueOf(jwt.getSubject()), que
+     * revienta con NumberFormatException contra un GUID real.
+     */
     private Long extraerUsuarioId(Jwt jwt) {
         Object userId = jwt.getClaim("userId");
-        if (userId == null) {
-            // Fallback: usar el subject como identificador si el IdP no manda userId explicito
-            return Long.valueOf(jwt.getSubject());
+        if (userId != null) {
+            try {
+                return Long.valueOf(userId.toString());
+            } catch (NumberFormatException ignored) {
+                // cae al derivado desde el subject
+            }
         }
-        return Long.valueOf(userId.toString());
+        return (long) Math.abs(jwt.getSubject().hashCode());
     }
 }

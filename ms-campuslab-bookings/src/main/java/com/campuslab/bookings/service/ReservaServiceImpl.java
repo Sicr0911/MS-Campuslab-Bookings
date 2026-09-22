@@ -37,14 +37,14 @@ public class ReservaServiceImpl implements ReservaService {
 
     @Override
     @Transactional
-    public ReservaResponseDTO crear(ReservaRequestDTO request) {
+    public ReservaResponseDTO crear(ReservaRequestDTO request, Long usuarioSolicitanteId) {
         if (!request.getFechaFin().isAfter(request.getFechaInicio())) {
             throw new IllegalArgumentException("fechaFin debe ser posterior a fechaInicio");
         }
 
         Reserva reserva = Reserva.builder()
                 .recursoId(request.getRecursoId())
-                .usuarioSolicitanteId(request.getUsuarioSolicitanteId())
+                .usuarioSolicitanteId(usuarioSolicitanteId)
                 .fechaInicio(request.getFechaInicio())
                 .fechaFin(request.getFechaFin())
                 .observaciones(request.getObservaciones())

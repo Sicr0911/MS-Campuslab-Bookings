@@ -21,8 +21,9 @@ public class ReservaRequestDTO {
     @NotNull(message = "recursoId es obligatorio")
     private Long recursoId;
 
-    @NotNull(message = "usuarioSolicitanteId es obligatorio")
-    private Long usuarioSolicitanteId;
+    // No incluye usuarioSolicitanteId: se deriva del JWT en el controller
+    // (ver ReservaController#crear), nunca se confia en lo que reporte el
+    // cliente para evitar que alguien cree una reserva a nombre de otro.
 
     @NotNull(message = "fechaInicio es obligatoria")
     @Future(message = "fechaInicio debe ser una fecha futura")
