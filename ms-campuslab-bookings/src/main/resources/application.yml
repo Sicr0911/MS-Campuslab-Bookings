@@ -49,6 +49,17 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.201.119.90:9092}
 
+  # Cluster RabbitMQ self-hosted (infra/mq): bookings publica ahi los eventos
+  # de cambio de estado de una reserva para que ms-campuslab-notify dispare
+  # el email/ticket/voucher correspondiente. Credenciales de desarrollo local
+  # (admin/admin_dev); en EC2 se sobrescriben via variables de entorno desde
+  # un .env fuera de control de versiones.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin_dev}
+
 management:
   endpoints:
     web:
@@ -63,6 +74,8 @@ management:
     # broker (externo, fuera de esta red) y lo tumbaria a DOWN si ese broker
     # no esta disponible en este momento, aunque la app en si funcione bien.
     kafka:
+      enabled: false
+    rabbit:
       enabled: false
 
 # URL base del microservicio ms-campuslab-catalog, consultado por CatalogClient

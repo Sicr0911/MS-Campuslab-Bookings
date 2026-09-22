@@ -31,13 +31,18 @@
         <!--
             Mensajeria: bookings es la fuente de los eventos de dominio del
             ciclo de vida de una reserva (SOLICITADA -> APROBADA -> ... ),
-            por lo que publica esos cambios de estado a Kafka. No usa
-            RabbitMQ: no tiene responsabilidad de notificaciones/colas punto
-            a punto, esa la tiene catalog.
+            por lo que publica esos cambios de estado a Kafka (bookings.events,
+            para audit/report) y tambien a RabbitMQ (cmd.direct/cmd.topic,
+            para que ms-campuslab-notify envie el email/ticket/voucher
+            correspondiente a cada transicion).
         -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
 
         <!-- Persistencia JPA -->

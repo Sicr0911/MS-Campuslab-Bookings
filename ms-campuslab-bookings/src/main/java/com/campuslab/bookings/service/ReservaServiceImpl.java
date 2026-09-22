@@ -8,6 +8,7 @@ import com.campuslab.bookings.dto.ReservaRequestDTO;
 import com.campuslab.bookings.dto.ReservaResponseDTO;
 import com.campuslab.bookings.exception.ReservaNotFoundException;
 import com.campuslab.bookings.exception.TransicionEstadoInvalidaException;
+import com.campuslab.bookings.messaging.ReservaEventPublisher;
 import com.campuslab.bookings.model.EstadoReserva;
 import com.campuslab.bookings.model.Reserva;
 import com.campuslab.bookings.repository.ReservaRepository;
@@ -30,6 +31,7 @@ public class ReservaServiceImpl implements ReservaService {
 
     private final ReservaRepository reservaRepository;
     private final CatalogClient catalogClient;
+    private final ReservaEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -88,7 +90,7 @@ public class ReservaServiceImpl implements ReservaService {
         validarTransicionTopologica(estadoActual, estadoDestino);
         validarReglasDeNegocioPorEstadoDestino(reserva, estadoDestino, rolesUsuario, request);
 
-        aplicarEfectosColaterales(reserva, estadoDestino, usuarioQueEjecutaId, request);
+        aplicarEfectosColaterales(reserva, estadoActual, estadoDestino, usuarioQueEjecutaId, request);
         reserva.setEstado(estadoDestino);
 
         Reserva actualizada = reservaRepository.save(reserva);
@@ -177,16 +179,43 @@ public class ReservaServiceImpl implements ReservaService {
         }
     }
 
+    /**
+     * Efectos colaterales de una transicion de estado: registro de aprobacion,
+     * ajuste de stock/cupo en catalog y publicacion del evento correspondiente
+     * a RabbitMQ para que notify avise al estudiante/tecnico. El stock se
+     * descuenta al aprobar (se reserva el cupo) y se devuelve si la reserva
+     * se cancela despues de haber sido aprobada, o cuando el recurso se
+     * marca DEVUELTA (vuelve a estar disponible).
+     */
     private void aplicarEfectosColaterales(Reserva reserva,
+                                            EstadoReserva actual,
                                             EstadoReserva destino,
                                             Long usuarioQueEjecutaId,
                                             CambioEstadoRequestDTO request) {
-        if (destino == EstadoReserva.APROBADA) {
-            reserva.setAprobadoPor(usuarioQueEjecutaId);
-            reserva.setFechaAprobacion(LocalDateTime.now());
-        }
-        if (destino == EstadoReserva.CANCELADA) {
-            reserva.setMotivoCancelacion(request.getMotivoCancelacion());
+        switch (destino) {
+            case APROBADA -> {
+                reserva.setAprobadoPor(usuarioQueEjecutaId);
+                reserva.setFechaAprobacion(LocalDateTime.now());
+                catalogClient.ajustarStock(reserva.getRecursoId(), -1);
+                eventPublisher.publicarAprobada(reserva);
+            }
+            case EN_PREPARACION -> eventPublisher.publicarEnPreparacion(reserva);
+            case EN_USO -> eventPublisher.publicarEnUso(reserva);
+            case CANCELADA -> {
+                reserva.setMotivoCancelacion(request.getMotivoCancelacion());
+                if (actual != EstadoReserva.SOLICITADA) {
+                    // Ya se habia descontado el stock al aprobar; se devuelve.
+                    catalogClient.ajustarStock(reserva.getRecursoId(), 1);
+                }
+                eventPublisher.publicarCancelada(reserva);
+            }
+            case DEVUELTA -> {
+                catalogClient.ajustarStock(reserva.getRecursoId(), 1);
+                eventPublisher.publicarDevuelta(reserva);
+            }
+            default -> {
+                // SOLICITADA no es un destino valido de transicion (topologia lo impide).
+            }
         }
     }
 

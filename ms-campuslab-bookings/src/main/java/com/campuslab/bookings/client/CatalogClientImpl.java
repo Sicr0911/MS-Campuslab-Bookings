@@ -7,6 +7,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.Map;
+
 @Component
 public class CatalogClientImpl implements CatalogClient {
 
@@ -31,6 +33,22 @@ public class CatalogClientImpl implements CatalogClient {
         } catch (RestClientException ex) {
             throw new CatalogClientException(
                     "No fue posible consultar el catalogo para el recurso " + recursoId, ex);
+        }
+    }
+
+    @Override
+    public void ajustarStock(Long recursoId, int delta) {
+        CatalogResourceDTO actual = obtenerRecurso(recursoId);
+        int nuevoStock = Math.max(0, actual.getStockCupo() + delta);
+        try {
+            restClient.put()
+                    .uri("/api/catalog/resources/{id}", recursoId)
+                    .body(Map.of("stockCupo", nuevoStock))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException ex) {
+            throw new CatalogClientException(
+                    "No fue posible actualizar el stock del recurso " + recursoId + " en el catalogo", ex);
         }
     }
 }

@@ -15,4 +15,14 @@ public interface CatalogClient {
      *                                 o si el catalogo no responde correctamente.
      */
     CatalogResourceDTO obtenerRecurso(Long recursoId);
+
+    /**
+     * Ajusta (suma/resta) el stock/cupo de un recurso en el catalogo.
+     * Usado para descontar stock al aprobar una reserva y devolverlo al
+     * cancelarla (si ya se habia descontado) o al marcarla DEVUELTA.
+     *
+     * @param delta positivo para incrementar, negativo para decrementar.
+     * @throws CatalogClientException si el recurso no existe o el catalogo no responde.
+     */
+    void ajustarStock(Long recursoId, int delta);
 }
