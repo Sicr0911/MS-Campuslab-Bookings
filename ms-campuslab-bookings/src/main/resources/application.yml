@@ -64,6 +64,11 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:admin}
     password: ${RABBITMQ_PASSWORD:admin_dev}
+    # Mensajes que no coinciden con ningun binding vuelven al productor y se
+    # registran en el log (ver RabbitMqConfig#mensajesNoEnrutadosCustomizer).
+    publisher-returns: true
+    template:
+      mandatory: true
 
 management:
   endpoints:
@@ -88,6 +93,15 @@ management:
 campuslab:
   services:
     catalog-base-url: ${CATALOG_SERVICE_URL:http://localhost:8081}
+  # Exchange y routing keys de los comandos que bookings publica a RabbitMQ
+  # (ver RabbitMqProperties). Deben coincidir con los bindings de
+  # ms-campuslab-notify e infra/mq/definitions.json.
+  rabbitmq:
+    exchange: ${RABBITMQ_CMD_EXCHANGE:cmd.direct}
+    routing-keys:
+      email: email.send
+      prep: prep.ticket
+      voucher: voucher.gen
 
 logging:
   level:
