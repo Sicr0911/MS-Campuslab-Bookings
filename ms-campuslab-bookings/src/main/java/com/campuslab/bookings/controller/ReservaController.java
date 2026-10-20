@@ -1,5 +1,6 @@
 package com.campuslab.bookings.controller;
 
+import com.campuslab.bookings.config.SecurityConfig;
 import com.campuslab.bookings.dto.CambioEstadoRequestDTO;
 import com.campuslab.bookings.dto.ReservaRequestDTO;
 import com.campuslab.bookings.dto.ReservaResponseDTO;
@@ -104,6 +105,7 @@ public class ReservaController {
         }
         return roles.stream()
                 .map(r -> r.replace("ROLE_", ""))
+                .map(SecurityConfig::normalizarRol)
                 .collect(Collectors.toSet());
     }
 
