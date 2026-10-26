@@ -41,14 +41,14 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # URL del Identity Provider (ej. ms-auth / Keycloak) que expone las claves publicas
-          issuer-uri: ${AUTH_ISSUER_URI:http://localhost:8080/realms/campuslab}
+          # Issuer de Azure AD (Microsoft Entra ID), el mismo IdP que valida el BFF
+          issuer-uri: ${AUTH_ISSUER_URI:https://login.microsoftonline.com/c75374e8-15d8-446b-8c6c-291120e0c761/v2.0}
 
   # Broker externo donde se publican los eventos de cambio de estado de una
   # reserva (ver spring-kafka en el pom.xml). bookings.events es la fuente
   # de verdad que consumen ms-campuslab-audit y ms-campuslab-report.
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:34.201.119.90:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:100.26.47.196:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -60,7 +60,7 @@ spring:
   # (admin/admin_dev); en EC2 se sobrescriben via variables de entorno desde
   # un .env fuera de control de versiones.
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
+    host: ${RABBITMQ_HOST:100.26.43.133}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:admin}
     password: ${RABBITMQ_PASSWORD:admin_dev}

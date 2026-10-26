@@ -97,7 +97,9 @@ HTTP 409 Conflict
 | `DB_SERVICE`      | Nombre del servicio/PDB                        | `XEPDB1`                  |
 | `DB_USERNAME`     | Usuario de BD                                  | `campuslab_bookings`      |
 | `DB_PASSWORD`     | Password de BD                                 | `changeme`                |
-| `AUTH_ISSUER_URI` | Issuer URI del IdP (Keycloak / ms-auth) que firma los JWT | `http://localhost:8080/realms/campuslab` |
+| `AUTH_ISSUER_URI` | Issuer URI de Azure AD que firma los JWT | `https://login.microsoftonline.com/<tenant>/v2.0` |
+| `RABBITMQ_HOST` | Host del broker RabbitMQ (instancia `ec2-mq`) | `100.26.43.133` |
+| `KAFKA_BOOTSTRAP_SERVERS` | Broker Kafka (instancia `ec2-kafka`) | `100.26.47.196:9092` |
 
 > **Nota sobre roles en el JWT**: `SecurityConfig` espera un claim `roles` (array
 > de strings, ej. `["ADMIN"]`) en el token. Si tu IdP real (ej. Keycloak) los
