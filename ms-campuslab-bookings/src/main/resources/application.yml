@@ -64,6 +64,11 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:admin}
     password: ${RABBITMQ_PASSWORD:admin_dev}
+    # Si el broker no responde, fallar en 5 s (por defecto son 60 s).
+    connection-timeout: 5s
+    # OutboxRelay espera el ack de cada mensaje: sin confirms, un exchange
+    # borrado o un broker que descarta el mensaje no se notaba.
+    publisher-confirm-type: correlated
     # Mensajes que no coinciden con ningun binding vuelven al productor y se
     # registran en el log (ver RabbitMqConfig#mensajesNoEnrutadosCustomizer).
     publisher-returns: true
@@ -102,6 +107,13 @@ campuslab:
       email: email.send
       prep: prep.ticket
       voucher: voucher.gen
+  # Envio de los comandos guardados en OUTBOX_RABBIT (ver OutboxRelay)
+  outbox:
+    relay:
+      intervalo-ms: ${OUTBOX_INTERVALO_MS:5000}
+      max-intentos: 20
+      timeout-confirmacion-ms: 5000
+      lote: 50
 
 logging:
   level:

@@ -13,6 +13,7 @@ import com.campuslab.bookings.repository.ReservaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -80,9 +81,9 @@ class ReservaServiceImplTest {
         request.setNuevoEstado(EstadoReserva.APROBADA);
 
         assertThatThrownBy(() ->
-                service.cambiarEstado(1L, request, 99L, Set.of("ESTUDIANTE")))
+                service.cambiarEstado(1L, request, 20L, Set.of("ESTUDIANTE"))) // su propia reserva
                 .isInstanceOf(TransicionEstadoInvalidaException.class)
-                .hasMessageContaining("TECNICO o ADMIN");
+                .hasMessageContaining("tecnico o admin");
     }
 
     @Test
@@ -144,6 +145,53 @@ class ReservaServiceImplTest {
         assertThatThrownBy(() ->
                 service.cambiarEstado(1L, request, 99L, Set.of("ADMIN")))
                 .isInstanceOf(TransicionEstadoInvalidaException.class);
+    }
+
+    @Test
+    void estudiantePuedeCancelarSuReservaConJustificacion() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA); // usuarioSolicitanteId = 20
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var resultado = service.cambiarEstado(1L,
+                new CambioEstadoRequestDTO(EstadoReserva.CANCELADA, "  Me cambiaron el horario de clases  "),
+                20L, Set.of("ESTUDIANTE"));
+
+        assertThat(resultado.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(resultado.getMotivoCancelacion()).isEqualTo("Me cambiaron el horario de clases");
+    }
+
+    @Test
+    void cancelarSinJustificacionSuficienteSeRechaza() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+
+        assertThatThrownBy(() -> service.cambiarEstado(1L,
+                new CambioEstadoRequestDTO(EstadoReserva.CANCELADA, "no voy"), 20L, Set.of("ESTUDIANTE")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("justificar");
+    }
+
+    @Test
+    void estudianteNoPuedeCancelarReservaAjena() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.SOLICITADA); // de usuario 20
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+
+        assertThatThrownBy(() -> service.cambiarEstado(1L,
+                new CambioEstadoRequestDTO(EstadoReserva.CANCELADA, "Motivo suficientemente largo"),
+                77L, Set.of("ESTUDIANTE")))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void estudianteNoPuedeHacerOtraTransicionQueCancelar() {
+        Reserva reserva = reservaEnEstado(EstadoReserva.APROBADA);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+
+        assertThatThrownBy(() -> service.cambiarEstado(1L,
+                new CambioEstadoRequestDTO(EstadoReserva.EN_PREPARACION, null), 20L, Set.of("ESTUDIANTE")))
+                .isInstanceOf(TransicionEstadoInvalidaException.class)
+                .hasMessageContaining("solo puede cancelar");
     }
 
     private Reserva reservaEnEstado(EstadoReserva estado) {

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,9 @@ import java.util.Set;
 public class ReservaServiceImpl implements ReservaService {
 
     private static final Set<String> ROLES_QUE_PUEDEN_APROBAR = Set.of("TECNICO", "ADMIN");
+
+    /** Largo minimo de la justificacion de una cancelacion (evita motivos vacios tipo "x"). */
+    static final int LARGO_MINIMO_MOTIVO_CANCELACION = 10;
 
     private final ReservaRepository reservaRepository;
     private final CatalogClient catalogClient;
@@ -90,6 +94,7 @@ public class ReservaServiceImpl implements ReservaService {
         EstadoReserva estadoActual = reserva.getEstado();
         EstadoReserva estadoDestino = request.getNuevoEstado();
 
+        validarPermisosDelEstudiante(reserva, estadoDestino, usuarioQueEjecutaId, rolesUsuario);
         validarTransicionTopologica(estadoActual, estadoDestino);
         validarReglasDeNegocioPorEstadoDestino(reserva, estadoDestino, rolesUsuario, request);
 
@@ -104,6 +109,31 @@ public class ReservaServiceImpl implements ReservaService {
     // ------------------------------------------------------------------
     // Validaciones de la maquina de estados
     // ------------------------------------------------------------------
+
+    /**
+     * Un usuario sin rol TECNICO/ADMIN (el Estudiante) solo puede cancelar
+     * sus propias reservas: aprobar, preparar, entregar y recibir la
+     * devolucion son tareas del personal del laboratorio.
+     */
+    private void validarPermisosDelEstudiante(Reserva reserva,
+                                               EstadoReserva destino,
+                                               Long usuarioQueEjecutaId,
+                                               Set<String> rolesUsuario) {
+        if (esPersonalDelLaboratorio(rolesUsuario)) {
+            return;
+        }
+        if (!reserva.getUsuarioSolicitanteId().equals(usuarioQueEjecutaId)) {
+            throw new AccessDeniedException("Solo puedes modificar tus propias reservas");
+        }
+        if (destino != EstadoReserva.CANCELADA) {
+            throw new TransicionEstadoInvalidaException(
+                    "Un estudiante solo puede cancelar sus reservas; el resto de cambios los hace un tecnico o admin");
+        }
+    }
+
+    public static boolean esPersonalDelLaboratorio(Set<String> rolesUsuario) {
+        return rolesUsuario != null && rolesUsuario.stream().anyMatch(ROLES_QUE_PUEDEN_APROBAR::contains);
+    }
 
     private void validarTransicionTopologica(EstadoReserva actual, EstadoReserva destino) {
         if (actual == destino) {
@@ -150,9 +180,12 @@ public class ReservaServiceImpl implements ReservaService {
                 }
             }
             case CANCELADA -> {
-                if (request.getMotivoCancelacion() == null || request.getMotivoCancelacion().isBlank()) {
-                    throw new IllegalArgumentException("motivoCancelacion es obligatorio para cancelar una reserva");
+                String motivo = request.getMotivoCancelacion() == null ? "" : request.getMotivoCancelacion().trim();
+                if (motivo.length() < LARGO_MINIMO_MOTIVO_CANCELACION) {
+                    throw new IllegalArgumentException("Debes justificar la cancelacion (minimo "
+                            + LARGO_MINIMO_MOTIVO_CANCELACION + " caracteres)");
                 }
+                request.setMotivoCancelacion(motivo);
             }
             default -> {
                 // EN_PREPARACION y DEVUELTA no requieren validaciones adicionales de rol/estado.

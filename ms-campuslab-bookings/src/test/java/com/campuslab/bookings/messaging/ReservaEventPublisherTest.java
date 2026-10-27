@@ -6,58 +6,52 @@ import com.campuslab.bookings.model.Reserva;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.AmqpConnectException;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.mockito.ArgumentCaptor;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class ReservaEventPublisherTest {
 
-    private RabbitTemplate rabbitTemplate;
+    private MensajeOutboxRepository outbox;
     private ReservaEventPublisher publisher;
 
     @BeforeEach
     void setUp() {
-        rabbitTemplate = mock(RabbitTemplate.class);
+        outbox = mock(MensajeOutboxRepository.class);
         RabbitMqProperties props = new RabbitMqProperties("x.prueba",
                 new RabbitMqProperties.RoutingKeys("rk.email", "rk.prep", "rk.voucher"));
-        publisher = new ReservaEventPublisher(rabbitTemplate, new ObjectMapper().findAndRegisterModules(), props);
+        publisher = new ReservaEventPublisher(outbox, new ObjectMapper().findAndRegisterModules(), props);
     }
 
     @Test
-    void aprobada_usaExchangeYRoutingKeyDeEmailDesdeLaConfiguracion() {
-        publisher.publicarAprobada(reserva(EstadoReserva.APROBADA));
+    void aprobada_quedaEnElOutboxConExchangeYRoutingKeyDeEmail() {
+        MensajeOutbox m = guardado(() -> publisher.publicarAprobada(reserva(EstadoReserva.APROBADA)));
 
-        verify(rabbitTemplate).convertAndSend(eq("x.prueba"), eq("rk.email"), contains("RESERVA_APROBADA"));
+        assertThat(m.getExchange()).isEqualTo("x.prueba");
+        assertThat(m.getRoutingKey()).isEqualTo("rk.email");
+        assertThat(m.getTipo()).isEqualTo("RESERVA_APROBADA");
+        assertThat(m.getCuerpo()).contains("\"reservaId\":5").contains(m.getEventId());
     }
 
     @Test
     void enPreparacion_usaRoutingKeyDeTicket() {
-        publisher.publicarEnPreparacion(reserva(EstadoReserva.EN_PREPARACION));
-
-        verify(rabbitTemplate).convertAndSend(eq("x.prueba"), eq("rk.prep"), contains("RESERVA_EN_PREPARACION"));
+        assertThat(guardado(() -> publisher.publicarEnPreparacion(reserva(EstadoReserva.EN_PREPARACION))).getRoutingKey())
+                .isEqualTo("rk.prep");
     }
 
     @Test
     void enUso_usaRoutingKeyDeVoucher() {
-        publisher.publicarEnUso(reserva(EstadoReserva.EN_USO));
-
-        verify(rabbitTemplate).convertAndSend(eq("x.prueba"), eq("rk.voucher"), contains("RESERVA_EN_USO"));
+        assertThat(guardado(() -> publisher.publicarEnUso(reserva(EstadoReserva.EN_USO))).getRoutingKey())
+                .isEqualTo("rk.voucher");
     }
 
-    @Test
-    void brokerCaido_noInterrumpeLaTransaccionDeNegocio() {
-        doThrow(new AmqpConnectException(new RuntimeException("sin conexion")))
-                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), anyString());
-
-        assertThatCode(() -> publisher.publicarCancelada(reserva(EstadoReserva.CANCELADA)))
-                .doesNotThrowAnyException();
+    private MensajeOutbox guardado(Runnable accion) {
+        accion.run();
+        ArgumentCaptor<MensajeOutbox> captor = ArgumentCaptor.forClass(MensajeOutbox.class);
+        verify(outbox).save(captor.capture());
+        return captor.getValue();
     }
 
     private Reserva reserva(EstadoReserva estado) {
